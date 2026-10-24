@@ -5,10 +5,18 @@ import unittest
 from pathlib import Path
 
 from pw_midi_volume.config import (
+    ACTION_MEDIA_NEXT,
+    ACTION_MUTE,
+    ACTION_MUTE_TOGGLE,
+    ACTION_VOLUME,
+    MEDIA_ACTIONS,
+    MUTE_MODE_ANY,
+    MUTE_MODE_PRESS,
     AppConfig,
     Binding,
     ConfigError,
     ConfigWatcher,
+    MediaConfig,
     MidiConfig,
     ensure_config,
     load_config,
@@ -47,6 +55,37 @@ bindings:
         self.assertEqual(binding.min_percent, 5.0)
         self.assertEqual(binding.max_percent, 90.0)
         self.assertFalse(binding.enabled)
+        self.assertEqual(binding.action, ACTION_VOLUME)
+
+    def test_media_binding_and_settings(self) -> None:
+        config = loads_config(
+            """
+version: 1
+media:
+  player: spotify
+  seek_seconds: 5
+bindings:
+  - action: media_next
+    cc: 50
+    channel: 0
+  - action: media_rewind
+    cc: 51
+"""
+        )
+        self.assertEqual(config.media, MediaConfig(player="spotify", seek_seconds=5.0))
+        self.assertEqual(config.bindings[0].action, ACTION_MEDIA_NEXT)
+        self.assertEqual(config.bindings[0].sink, "")
+        self.assertIn(config.bindings[0].action, MEDIA_ACTIONS)
+
+    def test_media_binding_does_not_require_sink(self) -> None:
+        config = loads_config("bindings:\n  - action: media_play_pause\n    cc: 1\n")
+        self.assertEqual(config.bindings[0].sink, "")
+
+    def test_invalid_media_seek(self) -> None:
+        with self.assertRaises(ConfigError):
+            loads_config("media:\n  seek_seconds: 0\n")
+        with self.assertRaises(ConfigError):
+            loads_config("media:\n  seek_seconds: 9999\n")
 
     def test_null_channel_and_port(self) -> None:
         config = loads_config(
@@ -90,6 +129,58 @@ bindings:
                 "    min_percent: 90\n    max_percent: 10\n"
             )
 
+    def test_mute_actions(self) -> None:
+        config = loads_config(
+            """
+version: 1
+bindings:
+  - sink: one
+    cc: 20
+    action: mute
+  - sink: two
+    cc: 21
+    action: mute_toggle
+    mute_mode: any
+  - sink: three
+    cc: 22
+    action: mute_toggle
+    mute_mode: press
+"""
+        )
+        self.assertEqual(config.bindings[0].action, ACTION_MUTE)
+        self.assertEqual(config.bindings[1].action, ACTION_MUTE_TOGGLE)
+        self.assertEqual(config.bindings[1].mute_mode, MUTE_MODE_ANY)
+        self.assertEqual(config.bindings[2].mute_mode, MUTE_MODE_PRESS)
+
+    def test_mute_toggle_default_mode(self) -> None:
+        config = loads_config(
+            """
+version: 1
+bindings:
+  - sink: foo
+    cc: 1
+    action: mute_toggle
+"""
+        )
+        self.assertEqual(config.bindings[0].mute_mode, MUTE_MODE_PRESS)
+
+    def test_invalid_mute_mode(self) -> None:
+        with self.assertRaises(ConfigError):
+            loads_config(
+                """
+version: 1
+bindings:
+  - sink: foo
+    cc: 1
+    action: mute_toggle
+    mute_mode: sometimes
+"""
+            )
+
+    def test_invalid_action(self) -> None:
+        with self.assertRaises(ConfigError):
+            loads_config("bindings:\n  - sink: foo\n    cc: 1\n    action: explode\n")
+
     def test_invalid_version(self) -> None:
         with self.assertRaises(ConfigError):
             loads_config("version: 2\n")
@@ -122,7 +213,66 @@ class ConfigFileTests(unittest.TestCase):
             save_config(path, config)
             loaded = load_config(path)
             self.assertEqual(loaded, config)
-            self.assertIn("sink: sink.name", path.read_text(encoding="utf-8"))
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("sink: sink.name", text)
+            self.assertIn("action: volume", text)
+
+    def test_mute_dump_omits_volume_range(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            config = AppConfig(
+                bindings=(
+                    Binding(
+                        sink="sink.name",
+                        cc=20,
+                        action=ACTION_MUTE,
+                    ),
+                )
+            )
+            save_config(path, config)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("action: mute", text)
+            self.assertNotIn("min_percent", text)
+            self.assertNotIn("max_percent", text)
+            self.assertEqual(load_config(path), config)
+
+    def test_media_dump_omits_sink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            config = AppConfig(
+                bindings=(
+                    Binding(
+                        sink="",
+                        cc=50,
+                        action=ACTION_MEDIA_NEXT,
+                    ),
+                )
+            )
+            save_config(path, config)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("action: media_next", text)
+            self.assertNotIn("sink:", text)
+            self.assertEqual(load_config(path), config)
+
+    def test_toggle_dump_includes_mute_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            config = AppConfig(
+                bindings=(
+                    Binding(
+                        sink="sink.name",
+                        cc=21,
+                        action=ACTION_MUTE_TOGGLE,
+                        mute_mode=MUTE_MODE_ANY,
+                    ),
+                )
+            )
+            save_config(path, config)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("action: mute_toggle", text)
+            self.assertIn("mute_mode: any", text)
+            self.assertNotIn("min_percent", text)
+            self.assertEqual(load_config(path), config)
 
     def test_missing_file_is_an_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory, self.assertRaises(ConfigError):

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pw-midi-volume"
-version = "1.0.0"
-description = "Control PipeWire sink volumes with MIDI CC controllers"
+version = "1.5.0"
+description = "Control PipeWire sink volume and mute with MIDI CC controllers"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -31,7 +31,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-pw_midi_volume = ["assets/*.svg"]
+pw_midi_volume = ["assets/*.svg", "locales/*.yaml", "locales/*.yml", "locales/*.json"]
 
 
 [tool.ruff]

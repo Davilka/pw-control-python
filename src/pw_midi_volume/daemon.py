@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 
 from .config import ConfigError, ConfigWatcher, default_config_path
-from .engine import BindingDispatcher, VolumeWorker
+from .engine import BindingDispatcher, SinkWorker
+from .media import MediaController, MediaWorker
 from .midi import MidiInputManager, MidiUnavailable
 from .pipewire import PipeWireController
 
@@ -37,10 +38,18 @@ class Daemon:
 
         self.watcher = ConfigWatcher(self.config_path)
         self.controller = PipeWireController()
-        self.worker = VolumeWorker(self.controller)
+        self.worker = SinkWorker(self.controller)
+        self.media_controller = MediaController()
+        self.media_worker = MediaWorker(
+            self.media_controller,
+            lambda: self.watcher.config,
+        )
         self.dispatcher = BindingDispatcher(
             lambda: self.watcher.config,
-            self.worker.submit,
+            self.worker.submit_volume,
+            self.worker.submit_mute,
+            self.worker.submit_mute_toggle,
+            self.media_worker.submit,
         )
         self.midi = MidiInputManager(self.dispatcher.on_cc)
 
@@ -107,9 +116,12 @@ class Daemon:
             )
 
         self.worker.start()
+        self.media_worker.start()
         try:
             self.midi.start()
         except MidiUnavailable:
+            self.midi.close()
+            self.media_worker.stop()
             self.worker.stop()
             raise
 
@@ -127,6 +139,7 @@ class Daemon:
         finally:
             LOG.info("shutting down")
             self.midi.close()
+            self.media_worker.stop()
             self.worker.stop()
 
 

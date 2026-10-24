@@ -17,6 +17,42 @@ LOG = logging.getLogger(__name__)
 
 CONFIG_VERSION = 1
 MAX_PERCENT = 100.0
+MUTE_THRESHOLD = 64
+
+ACTION_VOLUME = "volume"
+ACTION_MUTE = "mute"
+ACTION_MUTE_TOGGLE = "mute_toggle"
+
+ACTION_MEDIA_PLAY_PAUSE = "media_play_pause"
+ACTION_MEDIA_PLAY = "media_play"
+ACTION_MEDIA_PAUSE = "media_pause"
+ACTION_MEDIA_STOP = "media_stop"
+ACTION_MEDIA_NEXT = "media_next"
+ACTION_MEDIA_PREVIOUS = "media_previous"
+ACTION_MEDIA_REWIND = "media_rewind"
+ACTION_MEDIA_FAST_FORWARD = "media_fast_forward"
+MEDIA_ACTIONS = (
+    ACTION_MEDIA_PLAY_PAUSE,
+    ACTION_MEDIA_PLAY,
+    ACTION_MEDIA_PAUSE,
+    ACTION_MEDIA_STOP,
+    ACTION_MEDIA_NEXT,
+    ACTION_MEDIA_PREVIOUS,
+    ACTION_MEDIA_REWIND,
+    ACTION_MEDIA_FAST_FORWARD,
+)
+BINDING_ACTIONS = (
+    ACTION_VOLUME,
+    ACTION_MUTE,
+    ACTION_MUTE_TOGGLE,
+    *MEDIA_ACTIONS,
+)
+
+MUTE_MODE_PRESS = "press"
+MUTE_MODE_ANY = "any"
+MUTE_MODE_EDGE = "edge"
+MUTE_MODES = (MUTE_MODE_PRESS, MUTE_MODE_ANY, MUTE_MODE_EDGE)
+DEFAULT_MUTE_MODE = MUTE_MODE_PRESS
 
 DEFAULT_CONFIG_TEXT = """\
 # pw-midi-volume configuration
@@ -24,25 +60,62 @@ DEFAULT_CONFIG_TEXT = """\
 # Changes to this file are picked up automatically by the daemon (about 0.5 s).
 # You can also send SIGHUP to the daemon to force a reload.
 #
-# Example:
+# Examples:
 #
 #   bindings:
 #     - sink: "alsa_output.pci-0000_00_1f.3.analog-stereo"
+#       action: volume      # volume | mute | mute_toggle
 #       cc: 7
 #       channel: 0          # 0-15, or null for all MIDI channels
 #       min_percent: 0
 #       max_percent: 100
 #       enabled: true
 #
-# A sink is addressed by its PipeWire node.name. The GUI writes this field for
-# you. Several bindings may target the same sink, and one CC may control
-# several sinks at once.
+#     - sink: "alsa_output.pci-0000_00_1f.3.analog-stereo"
+#       action: mute        # CC below 64 = unmute, 64-127 = mute
+#       cc: 20
+#       channel: 0
+#       enabled: true
+#
+#     - sink: "alsa_output.pci-0000_00_1f.3.analog-stereo"
+#       action: mute_toggle # each button press toggles mute
+#       mute_mode: press    # press | any | edge
+#       cc: 21
+#       channel: 0
+#       enabled: true
+#
+#     - action: media_play_pause   # multimedia via MPRIS
+#       cc: 50
+#       channel: 0
+#       enabled: true
+#
+# Multimedia actions: media_play_pause, media_play, media_pause, media_stop,
+#   media_next, media_previous, media_rewind, media_fast_forward.
+#
+# mute_mode for mute_toggle:
+#   press - one toggle per press; repeated 127 messages within ~250 ms are
+#           treated as one press (works when release sends nothing or 0)
+#   any   - toggle on every CC message (for buttons alternating 127/0)
+#   edge  - toggle only on a transition from <64 to >=64
+#
+# Sink bindings are addressed by their PipeWire node.name. Multimedia bindings
+# do not use a sink and control the active MPRIS player instead. The GUI writes
+# these fields for you. Several bindings may target the same sink, and one CC
+# may control several sinks at once.
 
 version: 1
 midi:
   # null = listen to every MIDI input, or a case-insensitive part of a port
   # name, for example "Launch Control".
   port: null
+
+media:
+  # null = automatically use the active MPRIS player, or a case-insensitive
+  # part of the player's D-Bus name, for example "spotify" or "chromium".
+  player: null
+  # Seek step for media_rewind and media_fast_forward, in seconds.
+  seek_seconds: 10
+
 bindings: []
 """
 
@@ -59,6 +132,14 @@ class MidiConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class MediaConfig:
+    """Global MPRIS multimedia settings."""
+
+    player: str | None = None
+    seek_seconds: float = 10.0
+
+
+@dataclass(frozen=True, slots=True)
 class Binding:
     """A single MIDI CC -> PipeWire sink binding."""
 
@@ -68,6 +149,8 @@ class Binding:
     min_percent: float = 0.0
     max_percent: float = 100.0
     enabled: bool = True
+    action: str = ACTION_VOLUME
+    mute_mode: str = DEFAULT_MUTE_MODE
 
     def volume_fraction(self, midi_value: int) -> float:
         """Map a 0..127 MIDI value to a 0.0..1.0 PipeWire volume."""
@@ -84,6 +167,7 @@ class AppConfig:
     """Complete application configuration."""
 
     midi: MidiConfig = field(default_factory=MidiConfig)
+    media: MediaConfig = field(default_factory=MediaConfig)
     bindings: tuple[Binding, ...] = ()
     version: int = CONFIG_VERSION
 
@@ -138,10 +222,6 @@ def _parse_binding(raw: Any, index: int) -> Binding:
     what = f"bindings[{index}]"
     data = _mapping(raw, what)
 
-    sink = data.get("sink")
-    if not isinstance(sink, str) or not sink.strip():
-        raise ConfigError(f"{what}.sink must be a non-empty string")
-
     if "cc" not in data:
         raise ConfigError(f"{what}.cc is required")
     cc = _as_int(data["cc"], f"{what}.cc", 0, 127)
@@ -153,12 +233,39 @@ def _parse_binding(raw: Any, index: int) -> Binding:
     else:
         channel = _as_int(channel_raw, f"{what}.channel", 0, 15)
 
-    min_percent = _as_percent(data.get("min_percent"), f"{what}.min_percent", 0.0)
-    max_percent = _as_percent(
-        data.get("max_percent"), f"{what}.max_percent", MAX_PERCENT
-    )
-    if min_percent > max_percent:
-        raise ConfigError(f"{what}.min_percent must not be greater than max_percent")
+    action_raw = data.get("action", ACTION_VOLUME)
+    if not isinstance(action_raw, str) or action_raw not in BINDING_ACTIONS:
+        raise ConfigError(f"{what}.action must be one of: {', '.join(BINDING_ACTIONS)}")
+
+    if action_raw in MEDIA_ACTIONS:
+        sink = ""
+    else:
+        sink_raw = data.get("sink")
+        if not isinstance(sink_raw, str) or not sink_raw.strip():
+            raise ConfigError(f"{what}.sink must be a non-empty string")
+        sink = sink_raw.strip()
+
+    mute_mode = DEFAULT_MUTE_MODE
+    if action_raw == ACTION_MUTE_TOGGLE:
+        mute_mode_raw = data.get("mute_mode", DEFAULT_MUTE_MODE)
+        if not isinstance(mute_mode_raw, str) or mute_mode_raw not in MUTE_MODES:
+            raise ConfigError(
+                f"{what}.mute_mode must be one of: {', '.join(MUTE_MODES)}"
+            )
+        mute_mode = mute_mode_raw
+
+    if action_raw == ACTION_VOLUME:
+        min_percent = _as_percent(data.get("min_percent"), f"{what}.min_percent", 0.0)
+        max_percent = _as_percent(
+            data.get("max_percent"), f"{what}.max_percent", MAX_PERCENT
+        )
+        if min_percent > max_percent:
+            raise ConfigError(
+                f"{what}.min_percent must not be greater than max_percent"
+            )
+    else:
+        min_percent = 0.0
+        max_percent = MAX_PERCENT
 
     enabled_raw = data.get("enabled", True)
     if not isinstance(enabled_raw, bool):
@@ -171,6 +278,8 @@ def _parse_binding(raw: Any, index: int) -> Binding:
         min_percent=min_percent,
         max_percent=max_percent,
         enabled=enabled_raw,
+        action=action_raw,
+        mute_mode=mute_mode,
     )
 
 
@@ -206,6 +315,22 @@ def loads_config(text: str, *, source: str | None = None) -> AppConfig:
     else:
         raise ConfigError("midi.port must be a string or null")
 
+    media_raw = data.get("media")
+    media_data = _mapping(media_raw, "media") if media_raw is not None else {}
+    player_raw = media_data.get("player")
+    if player_raw is None:
+        media_player = None
+    elif isinstance(player_raw, str):
+        media_player = player_raw.strip() or None
+    else:
+        raise ConfigError("media.player must be a string or null")
+    seek_raw = media_data.get("seek_seconds", 10)
+    if isinstance(seek_raw, bool) or not isinstance(seek_raw, (int, float)):
+        raise ConfigError("media.seek_seconds must be a number")
+    media_seek_seconds = float(seek_raw)
+    if not 1.0 <= media_seek_seconds <= 600.0:
+        raise ConfigError("media.seek_seconds must be between 1 and 600")
+
     bindings_raw = data.get("bindings", [])
     if bindings_raw is None:
         bindings_raw = []
@@ -215,6 +340,10 @@ def loads_config(text: str, *, source: str | None = None) -> AppConfig:
     bindings = tuple(_parse_binding(item, i) for i, item in enumerate(bindings_raw))
     return AppConfig(
         midi=MidiConfig(port=port),
+        media=MediaConfig(
+            player=media_player,
+            seek_seconds=media_seek_seconds,
+        ),
         bindings=bindings,
         version=version,
     )
@@ -233,23 +362,36 @@ def load_config(path: str | Path) -> AppConfig:
     return loads_config(text, source=str(config_path))
 
 
+def _binding_to_dict(binding: Binding) -> dict[str, Any]:
+    item: dict[str, Any] = {"action": binding.action}
+    if binding.action not in MEDIA_ACTIONS:
+        item["sink"] = binding.sink
+    item.update(
+        {
+            "cc": binding.cc,
+            "channel": binding.channel,
+        }
+    )
+    if binding.action == ACTION_VOLUME:
+        item["min_percent"] = binding.min_percent
+        item["max_percent"] = binding.max_percent
+    elif binding.action == ACTION_MUTE_TOGGLE:
+        item["mute_mode"] = binding.mute_mode
+    item["enabled"] = binding.enabled
+    return item
+
+
 def dump_config(config: AppConfig) -> str:
     """Serialise a configuration to canonical YAML text."""
 
     data: dict[str, Any] = {
         "version": CONFIG_VERSION,
         "midi": {"port": config.midi.port},
-        "bindings": [
-            {
-                "sink": binding.sink,
-                "cc": binding.cc,
-                "channel": binding.channel,
-                "min_percent": binding.min_percent,
-                "max_percent": binding.max_percent,
-                "enabled": binding.enabled,
-            }
-            for binding in config.bindings
-        ],
+        "media": {
+            "player": config.media.player,
+            "seek_seconds": config.media.seek_seconds,
+        },
+        "bindings": [_binding_to_dict(binding) for binding in config.bindings],
     }
     body = yaml.safe_dump(
         data,
@@ -260,7 +402,8 @@ def dump_config(config: AppConfig) -> str:
     header = (
         "# pw-midi-volume configuration\n"
         "# The daemon watches this file and reloads it automatically.\n"
-        "# Bindings are addressed by PipeWire sink node.name.\n\n"
+        "# Sink bindings are addressed by PipeWire node.name; multimedia "
+        "bindings use MPRIS.\n\n"
     )
     return header + body
 

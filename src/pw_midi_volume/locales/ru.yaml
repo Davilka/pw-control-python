@@ -1,0 +1,120 @@
+# pw-midi-volume locale file
+# Place additional locale files in this folder as .yaml, .yml or .json.
+# See README.md for the format.
+
+language: ru
+name: Русский
+strings:
+  window.title: pw-midi-volume — MIDI-настройки
+  app.subtitle: Громкость и mute audio-sink по MIDI Control Change. Изменения сохраняются в YAML и подхватываются демоном
+    автоматически. Входящие MIDI-сообщения видны внизу.
+  language.label: 'Язык:'
+  tooltip.refresh_languages: Перечитать файлы локализаций в папке locales
+  midi.input_label: 'MIDI-вход:'
+  button.refresh_midi: Обновить MIDI
+  tooltip.refresh_midi: Перечитать список MIDI-устройств
+  button.refresh_sinks: Обновить sinks
+  tooltip.refresh_sinks: Перечитать список PipeWire audio-sink
+  group.bindings: Привязки
+  table.sink: Sink (PipeWire)
+  table.action: Действие
+  table.cc: CC
+  table.channel: Канал
+  table.min: Мин.
+  table.max: Макс.
+  table.enabled: Вкл.
+  button.add_binding: Добавить привязку
+  button.cancel_learn: Отменить обучение
+  hint.learn: 'MIDI Learn подставляет CC и канал. Для кнопок mute выберите режим: «нажатие 127» — если отпускание не приходит
+    или приходит 0; «127/0» — если кнопка чередует значения; «переход 0→127» — для защиты от повторов.'
+  button.reload: Перечитать
+  tooltip.reload: Перечитать YAML с диска (Ctrl+R)
+  button.save: Сохранить
+  tooltip.save: Сохранить YAML (Ctrl+S)
+  group.midi_log: Лог MIDI
+  midi.monitor_starting: 'MIDI-монитор: запуск…'
+  midi.monitor_unavailable: 'MIDI-монитор: недоступен'
+  midi.monitor_stopped: 'MIDI-монитор: остановлен'
+  midi.monitor_error: 'MIDI-монитор: ошибка'
+  midi.monitor_active: 'MIDI-монитор: активен, входов: {count}, {source}'
+  midi.monitor_no_inputs: 'MIDI-монитор: активен, входов нет, {source}'
+  midi.source_all: все входы
+  midi.no_ports: Нет доступных MIDI-входов
+  midi.all_inputs: Все MIDI-входы
+  button.clear_log: Очистить
+  tooltip.clear_log: Очистить окно лога
+  button.pause: Пауза
+  button.resume: Продолжить
+  tooltip.pause_log: Приостановить вывод новых сообщений (MIDI Learn продолжит работать)
+  log.placeholder: Здесь будут появляться входящие MIDI-сообщения…
+  common.not_found: '{name} (не найден)'
+  channel.all: Все
+  learn.button: MIDI Learn
+  learn.listening: Слушаю…
+  learn.tooltip: Нажмите, затем подвиньте регулятор или нажмите кнопку на MIDI-контроллере.
+  delete.tooltip: Удалить привязку
+  action.volume: Громкость
+  action.mute: 'Mute: CC ≥ 64'
+  action.toggle_press: 'Mute: нажатие 127'
+  action.toggle_any: 'Mute: 127/0 (каждое)'
+  action.toggle_edge: 'Mute: переход 0→127'
+  tooltip.action: "Громкость: CC управляет уровнем.\nMute: CC 0–63 включает звук, CC 64–127 выключает.\nMute: нажатие 127\
+    \ — одно переключение на нажатие; повторные 127 в пределах ~250 мс считаются одним нажатием.\n   Подходит, если отпускание\
+    \ не приходит или приходит 0.\nMute: 127/0 — переключение на каждое сообщение;\n   подходит для кнопок, которые чередуют\
+    \ 127 и 0.\nMute: переход 0→127 — только при переходе из 0–63 в 64–127;\n   защищает от повторов 127 при удержании.\n\
+    Медиа-действия управляют активным MPRIS-плеером."
+  tooltip.sink: Sink PipeWire. Можно выбрать из списка или ввести node.name вручную.
+  tooltip.volume_range: Диапазон громкости для CC 0…127.
+  tooltip.not_used_for_mute: Не используется для mute-действий.
+  tooltip.binding_enabled: Привязка активна
+  status.startup: 'Выберите MIDI-вход и привязки. Файл настроек: {path}'
+  status.loaded: 'Загружено привязок: {count}'
+  status.saved: Настройки сохранены. Демон перечитает файл автоматически.
+  status.config_reloaded: Конфигурация перечитана
+  status.scan_sinks: 'Найдено PipeWire sinks: {count}'
+  status.scan_midi: 'Найдено MIDI-входов: {count}'
+  status.midi_input: 'MIDI-вход: {source}'
+  status.binding_added: Привязка добавлена. Настройте CC/канал или используйте MIDI Learn.
+  status.binding_deleted: Привязка удалена
+  status.log_cleared: Лог MIDI очищен
+  status.learn_cancelled: Обучение отменено
+  status.learn_timeout: Время ожидания MIDI CC истекло. Попробуйте ещё раз.
+  status.learn_captured: Получен CC {cc}, канал {channel} ({port}). Не забудьте сохранить.
+  status.waiting_cc: Ожидание MIDI CC… Подвиньте регулятор или нажмите кнопку. Esc — отмена.
+  status.language_changed: 'Язык: {name}'
+  log.monitor_started: '--- MIDI-монитор: {names} ---'
+  log.monitor_not_started: '--- MIDI-монитор не запущен: {error} ---'
+  log.scan_error: '--- Ошибка сканирования MIDI-устройств: {error} ---'
+  log.no_inputs: нет входов
+  dialog.config_error.title: Ошибка конфигурации
+  dialog.config_error.initial: '{error}
+
+
+    Приложение запущено с пустыми настройками. Исправьте файл вручную или сохраните новые настройки.'
+  dialog.save_error.title: Не удалось сохранить
+  dialog.pipewire_error.title: PipeWire недоступен
+  dialog.midi_error.title: MIDI недоступен
+  dialog.midi_unavailable_detail: Не удалось открыть MIDI-вход. Проверьте подключение.
+  dialog.reload.title: Перечитать конфигурацию?
+  dialog.reload.message: Несохранённые изменения будут потеряны. Продолжить?
+  dialog.unsaved.title: Несохранённые изменения
+  dialog.unsaved.message: Сохранить изменения перед выходом?
+  error.row_sink: 'Строка {row}: выберите sink или введите его node.name.'
+  error.row_action: 'Строка {row}: неизвестное действие.'
+  error.row_range: 'Строка {row}: минимальная громкость больше максимальной.'
+  error.row_duplicate: 'Строка {row}: такая привязка уже существует (sink, CC {cc}, канал).'
+  tray.tooltip: pw-midi-volume — MIDI → PipeWire
+  tray.show: Открыть настройки
+  tray.save: Сохранить
+  tray.reload: Перечитать конфигурацию
+  tray.quit: Выход
+  tray.minimized: Приложение свёрнуто в системный трей. Двойной клик по значку откроет настройки.
+  action.media_play_pause: 'Медиа: Play/Pause'
+  action.media_play: 'Медиа: Воспроизвести'
+  action.media_pause: 'Медиа: Пауза'
+  action.media_stop: 'Медиа: Стоп'
+  action.media_next: 'Медиа: Следующий трек'
+  action.media_previous: 'Медиа: Предыдущий трек'
+  action.media_rewind: 'Медиа: Перемотка назад'
+  action.media_fast_forward: 'Медиа: Перемотка вперёд'
+  tooltip.not_used_for_multimedia: Не используется для мультимедиа-действий.

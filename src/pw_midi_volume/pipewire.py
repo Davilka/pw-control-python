@@ -203,12 +203,14 @@ class PipeWireController:
             sinks = self.list_sinks(force=force)
             return self._find(sinks, sink_key)
 
-    def set_volume(self, sink_key: str, volume: float) -> Sink:
-        """Set all channels of a sink to ``volume`` (0.0 .. 1.0)."""
+    def _act_on_sink(
+        self,
+        sink_key: str,
+        build_command: Callable[[Sink], Sequence[str]],
+    ) -> Sink:
+        """Resolve a sink and run a wpctl command, retrying once after hot-plug."""
 
-        value = max(0.0, min(1.0, float(volume)))
         last_error: PipeWireError | None = None
-
         for attempt in range(2):
             with self._lock:
                 sink = self.resolve(sink_key, force=attempt > 0)
@@ -216,28 +218,62 @@ class PipeWireController:
                     last_error = SinkNotFoundError(f"sink not found: {sink_key!r}")
                     continue
 
-                args = [
-                    "wpctl",
-                    "set-volume",
-                    "--limit",
-                    "1.0",
-                    str(sink.id),
-                    f"{value:.6f}",
-                ]
                 try:
-                    self._runner(args)
+                    self._runner(build_command(sink))
                 except PipeWireError as exc:
                     last_error = exc
                     self.invalidate()
                     continue
-
-                LOG.debug(
-                    "set sink %s (%s) volume to %.1f%%",
-                    sink.name,
-                    sink.id,
-                    value * 100.0,
-                )
                 return sink
 
         assert last_error is not None
         raise last_error
+
+    def set_volume(self, sink_key: str, volume: float) -> Sink:
+        """Set all channels of a sink to ``volume`` (0.0 .. 1.0)."""
+
+        value = max(0.0, min(1.0, float(volume)))
+        sink = self._act_on_sink(
+            sink_key,
+            lambda sink: [
+                "wpctl",
+                "set-volume",
+                "--limit",
+                "1.0",
+                str(sink.id),
+                f"{value:.6f}",
+            ],
+        )
+        LOG.debug(
+            "set sink %s (%s) volume to %.1f%%",
+            sink.name,
+            sink.id,
+            value * 100.0,
+        )
+        return sink
+
+    def set_mute(self, sink_key: str, muted: bool) -> Sink:
+        """Mute or unmute all channels of a sink."""
+
+        state = "1" if muted else "0"
+        sink = self._act_on_sink(
+            sink_key,
+            lambda sink: ["wpctl", "set-mute", str(sink.id), state],
+        )
+        LOG.debug(
+            "set sink %s (%s) mute=%s",
+            sink.name,
+            sink.id,
+            muted,
+        )
+        return sink
+
+    def toggle_mute(self, sink_key: str) -> Sink:
+        """Toggle mute on a sink using WirePlumber's atomic toggle."""
+
+        sink = self._act_on_sink(
+            sink_key,
+            lambda sink: ["wpctl", "set-mute", str(sink.id), "toggle"],
+        )
+        LOG.debug("toggled sink %s (%s) mute", sink.name, sink.id)
+        return sink

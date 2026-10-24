@@ -1,5 +1,6 @@
 include README.md
 include LICENSE
 recursive-include src/pw_midi_volume/assets *.svg
+recursive-include src/pw_midi_volume/locales *.yaml *.yml *.json
 recursive-include contrib *
 recursive-include scripts *

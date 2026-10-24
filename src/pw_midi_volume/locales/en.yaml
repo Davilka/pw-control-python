@@ -1,0 +1,119 @@
+# pw-midi-volume locale file
+# Place additional locale files in this folder as .yaml, .yml or .json.
+# See README.md for the format.
+
+language: en
+name: English
+strings:
+  window.title: pw-midi-volume — MIDI Settings
+  app.subtitle: PipeWire sink volume and mute via MIDI Control Change. Changes are saved to YAML and picked up by the daemon
+    automatically. Incoming MIDI messages are shown below.
+  language.label: 'Language:'
+  tooltip.refresh_languages: Rescan locale files in the locales folder
+  midi.input_label: 'MIDI input:'
+  button.refresh_midi: Refresh MIDI
+  tooltip.refresh_midi: Rescan MIDI devices
+  button.refresh_sinks: Refresh sinks
+  tooltip.refresh_sinks: Rescan PipeWire audio sinks
+  group.bindings: Bindings
+  table.sink: Sink (PipeWire)
+  table.action: Action
+  table.cc: CC
+  table.channel: Channel
+  table.min: Min.
+  table.max: Max.
+  table.enabled: 'On'
+  button.add_binding: Add binding
+  button.cancel_learn: Cancel learn
+  hint.learn: 'MIDI Learn fills in CC and channel. For mute buttons choose a mode: “press 127” if release sends nothing or
+    0; “127/0” if the button alternates values; “transition 0→127” to ignore repeated values while held.'
+  button.reload: Reload
+  tooltip.reload: Reload YAML from disk (Ctrl+R)
+  button.save: Save
+  tooltip.save: Save YAML (Ctrl+S)
+  group.midi_log: MIDI log
+  midi.monitor_starting: 'MIDI monitor: starting…'
+  midi.monitor_unavailable: 'MIDI monitor: unavailable'
+  midi.monitor_stopped: 'MIDI monitor: stopped'
+  midi.monitor_error: 'MIDI monitor: error'
+  midi.monitor_active: 'MIDI monitor: active, inputs: {count}, {source}'
+  midi.monitor_no_inputs: 'MIDI monitor: active, no inputs, {source}'
+  midi.source_all: all inputs
+  midi.no_ports: No available MIDI inputs
+  midi.all_inputs: All MIDI inputs
+  button.clear_log: Clear
+  tooltip.clear_log: Clear the log window
+  button.pause: Pause
+  button.resume: Resume
+  tooltip.pause_log: Pause the log output (MIDI Learn keeps working)
+  log.placeholder: Incoming MIDI messages will appear here…
+  common.not_found: '{name} (not found)'
+  channel.all: All
+  learn.button: MIDI Learn
+  learn.listening: Listening…
+  learn.tooltip: Click, then move a control or press a button on the MIDI controller.
+  delete.tooltip: Delete this binding
+  action.volume: Volume
+  action.mute: 'Mute: CC ≥ 64'
+  action.toggle_press: 'Mute: press 127'
+  action.toggle_any: 'Mute: 127/0 (each)'
+  action.toggle_edge: 'Mute: transition 0→127'
+  tooltip.action: "Volume: CC controls the level.\nMute: CC 0–63 unmutes, CC 64–127 mutes.\nMute: press 127 — one toggle per\
+    \ press; repeated 127 within ~250 ms count as one press.\n   Works when release sends nothing or 0.\nMute: 127/0 — toggle\
+    \ on every message;\n   for buttons alternating 127 and 0.\nMute: transition 0→127 — only when crossing from 0–63 to 64–127;\n\
+    \   protects against repeated 127 while held.\nMedia actions control the active MPRIS player."
+  tooltip.sink: PipeWire sink. Select one from the list or enter its node.name manually.
+  tooltip.volume_range: Volume range for CC 0…127.
+  tooltip.not_used_for_mute: Not used for mute actions.
+  tooltip.binding_enabled: Binding is active
+  status.startup: 'Select a MIDI input and bindings. Settings file: {path}'
+  status.loaded: 'Loaded bindings: {count}'
+  status.saved: Settings saved. The daemon will reload the file automatically.
+  status.config_reloaded: Configuration reloaded
+  status.scan_sinks: 'Found PipeWire sinks: {count}'
+  status.scan_midi: 'Found MIDI inputs: {count}'
+  status.midi_input: 'MIDI input: {source}'
+  status.binding_added: Binding added. Configure CC/channel or use MIDI Learn.
+  status.binding_deleted: Binding deleted
+  status.log_cleared: MIDI log cleared
+  status.learn_cancelled: Learn cancelled
+  status.learn_timeout: MIDI CC timeout. Try again.
+  status.learn_captured: Received CC {cc}, channel {channel} ({port}). Do not forget to save.
+  status.waiting_cc: Waiting for MIDI CC… Move a control or press a button. Esc to cancel.
+  status.language_changed: 'Language: {name}'
+  log.monitor_started: '--- MIDI monitor: {names} ---'
+  log.monitor_not_started: '--- MIDI monitor failed to start: {error} ---'
+  log.scan_error: '--- MIDI device scan error: {error} ---'
+  log.no_inputs: no inputs
+  dialog.config_error.title: Configuration error
+  dialog.config_error.initial: '{error}
+
+
+    The application started with empty settings. Fix the file manually or save new settings.'
+  dialog.save_error.title: Could not save
+  dialog.pipewire_error.title: PipeWire is unavailable
+  dialog.midi_error.title: MIDI is unavailable
+  dialog.midi_unavailable_detail: Could not open a MIDI input. Check the connection.
+  dialog.reload.title: Reload configuration?
+  dialog.reload.message: Unsaved changes will be lost. Continue?
+  dialog.unsaved.title: Unsaved changes
+  dialog.unsaved.message: Save changes before exiting?
+  error.row_sink: 'Row {row}: select a sink or enter its node.name.'
+  error.row_action: 'Row {row}: unknown action.'
+  error.row_range: 'Row {row}: minimum volume is greater than maximum.'
+  error.row_duplicate: 'Row {row}: this binding already exists (sink, CC {cc}, channel).'
+  tray.tooltip: pw-midi-volume — MIDI → PipeWire
+  tray.show: Open settings
+  tray.save: Save
+  tray.reload: Reload configuration
+  tray.quit: Quit
+  tray.minimized: The application is minimized to the system tray. Double-click the icon to open settings.
+  action.media_play_pause: 'Media: Play/Pause'
+  action.media_play: 'Media: Play'
+  action.media_pause: 'Media: Pause'
+  action.media_stop: 'Media: Stop'
+  action.media_next: 'Media: Next track'
+  action.media_previous: 'Media: Previous track'
+  action.media_rewind: 'Media: Rewind'
+  action.media_fast_forward: 'Media: Fast forward'
+  tooltip.not_used_for_multimedia: Not used for multimedia actions.

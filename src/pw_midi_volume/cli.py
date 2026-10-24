@@ -8,7 +8,15 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .config import ConfigError, default_config_path, load_config
+from .config import (
+    ACTION_MUTE,
+    ACTION_MUTE_TOGGLE,
+    ACTION_VOLUME,
+    MEDIA_ACTIONS,
+    ConfigError,
+    default_config_path,
+    load_config,
+)
 from .daemon import run_daemon
 from .midi import MidiUnavailable, list_input_ports
 from .pipewire import PipeWireError, list_sinks
@@ -65,14 +73,24 @@ def _print_config(path: Path) -> int:
 
     print(f"config: {path}")
     print(f"MIDI input filter: {config.midi.port or 'any'}")
+    print(f"media player: {config.media.player or 'auto'}")
+    print(f"media seek step: {config.media.seek_seconds:g} s")
     print(f"bindings: {len(config.bindings)}")
     for index, binding in enumerate(config.bindings, start=1):
         channel = "all" if binding.channel is None else str(binding.channel + 1)
         state = "enabled" if binding.enabled else "disabled"
+        if binding.action == ACTION_VOLUME:
+            action = f"volume {binding.min_percent:g}-{binding.max_percent:g}%"
+        elif binding.action == ACTION_MUTE:
+            action = "mute (CC >= 64)"
+        elif binding.action == ACTION_MUTE_TOGGLE:
+            action = f"mute toggle ({binding.mute_mode})"
+        else:  # pragma: no cover - config validation prevents this
+            action = binding.action
+        target = "" if binding.action in MEDIA_ACTIONS else f" -> {binding.sink}"
         print(
-            f"  {index:2d}. CC {binding.cc:3d} ch {channel:>3} -> "
-            f"{binding.sink} ({binding.min_percent:g}-"
-            f"{binding.max_percent:g}%, {state})"
+            f"  {index:2d}. {action:<24} CC {binding.cc:3d} ch {channel:>3}"
+            f"{target} ({state})"
         )
     return 0
 

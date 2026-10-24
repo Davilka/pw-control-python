@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -17,11 +18,77 @@ class MidiUnavailable(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
-class CapturedCc:
+class MidiEvent:
+    """A raw MIDI message received from one input port."""
+
     port: str
-    channel: int
-    cc: int
-    value: int
+    message: tuple[int, ...]
+    timestamp: float
+
+
+_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def _note_name(number: int) -> str:
+    return f"{_NOTE_NAMES[number % 12]}{number // 12 - 1}"
+
+
+def describe_midi_message(message: Sequence[int]) -> str:
+    """Return a compact human-readable description of a MIDI message."""
+
+    if not message:
+        return "Empty message"
+
+    status = message[0]
+    if status >= 0xF0:
+        system_messages = {
+            0xF0: "SysEx",
+            0xF1: "MIDI Time Code",
+            0xF2: "Song Position",
+            0xF3: "Song Select",
+            0xF6: "Tune Request",
+            0xF7: "End of SysEx",
+            0xF8: "Clock",
+            0xFA: "Start",
+            0xFB: "Continue",
+            0xFC: "Stop",
+            0xFE: "Active Sensing",
+            0xFF: "Reset",
+        }
+        name = system_messages.get(status, f"System 0x{status:02X}")
+        return f"{name} ({len(message)} byte(s))"
+
+    message_type = status & 0xF0
+    channel = (status & 0x0F) + 1
+
+    if message_type == 0x80 and len(message) >= 3:
+        note = message[1] & 0x7F
+        velocity = message[2] & 0x7F
+        return f"ch {channel:02d}  Note Off {_note_name(note)} velocity {velocity}"
+    if message_type == 0x90 and len(message) >= 3:
+        note = message[1] & 0x7F
+        velocity = message[2] & 0x7F
+        if velocity == 0:
+            return f"ch {channel:02d}  Note Off {_note_name(note)} velocity 0"
+        return f"ch {channel:02d}  Note On {_note_name(note)} velocity {velocity}"
+    if message_type == 0xA0 and len(message) >= 3:
+        note = message[1] & 0x7F
+        pressure = message[2] & 0x7F
+        return f"ch {channel:02d}  Poly Pressure {_note_name(note)} = {pressure}"
+    if message_type == 0xB0 and len(message) >= 3:
+        cc = message[1] & 0x7F
+        value = message[2] & 0x7F
+        return f"ch {channel:02d}  CC {cc} = {value}"
+    if message_type == 0xC0 and len(message) >= 2:
+        return f"ch {channel:02d}  Program Change {message[1] & 0x7F}"
+    if message_type == 0xD0 and len(message) >= 2:
+        return f"ch {channel:02d}  Channel Pressure {message[1] & 0x7F}"
+    if message_type == 0xE0 and len(message) >= 3:
+        bend = (message[1] & 0x7F) | ((message[2] & 0x7F) << 7)
+        return f"ch {channel:02d}  Pitch Bend {bend - 8192:+d}"
+
+    raw = " ".join(f"{byte:02X}" for byte in message)
+    return f"Raw MIDI: {raw}"
 
 
 def port_matches(port_filter: str | None, port_name: str) -> bool:
@@ -86,15 +153,20 @@ class MidiInputManager:
     """Open all MIDI inputs and keep them in sync with device hot-plug events.
 
     One ALSA sequencer client is created per physical port. Multiple clients
-    (for example this daemon and the GUI's MIDI-learn helper) may subscribe to
+    (for example this daemon and the GUI MIDI monitor) may subscribe to
     the same controller at the same time.
     """
 
     def __init__(
         self,
-        on_cc: Callable[[str, int, int, int], None],
+        on_cc: Callable[[str, int, int, int], None] | None = None,
+        *,
+        on_message: Callable[[str, tuple[int, ...]], None] | None = None,
     ) -> None:
+        if on_cc is None and on_message is None:
+            raise ValueError("on_cc or on_message callback is required")
         self._on_cc = on_cc
+        self._on_message = on_message
         self._rtmidi: Any | None = None
         self._probe: Any | None = None
         self._opened: dict[tuple[str, int], _OpenPort] = {}
@@ -188,12 +260,16 @@ class MidiInputManager:
         try:
             if not event:
                 return
-            message = event[0]
-            parsed = parse_cc(message)
-            if parsed is None:
+            message = tuple(event[0])
+            if not message:
                 return
-            channel, cc, value = parsed
-            self._on_cc(port_name, channel, cc, value)
+            if self._on_message is not None:
+                self._on_message(port_name, message)
+            if self._on_cc is not None:
+                parsed = parse_cc(message)
+                if parsed is not None:
+                    channel, cc, value = parsed
+                    self._on_cc(port_name, channel, cc, value)
         except Exception:  # never kill the MIDI callback thread
             LOG.exception("error while handling MIDI message from %s", port_name)
 
@@ -211,23 +287,23 @@ class MidiInputManager:
             return sorted({entry.name for entry in self._opened.values()})
 
 
-class MidiSniffer:
-    """Capture the next CC message for the GUI's MIDI-learn feature."""
+class MidiEventStream:
+    """Continuously capture MIDI messages for the GUI monitor and MIDI Learn."""
 
     def __init__(self, port_filter: str | None = None) -> None:
         self._port_filter = port_filter
-        self._captured: queue.Queue[CapturedCc] = queue.Queue()
+        self._events: queue.Queue[MidiEvent] = queue.Queue()
         self._manager: MidiInputManager | None = None
 
-    def _on_cc(self, port: str, channel: int, cc: int, value: int) -> None:
+    def _on_message(self, port: str, message: tuple[int, ...]) -> None:
         if not port_matches(self._port_filter, port):
             return
-        self._captured.put(CapturedCc(port=port, channel=channel, cc=cc, value=value))
+        self._events.put(MidiEvent(port=port, message=message, timestamp=time.time()))
 
     def start(self) -> None:
         if self._manager is not None:
             return
-        manager = MidiInputManager(self._on_cc)
+        manager = MidiInputManager(on_message=self._on_message)
         try:
             manager.start()
         except Exception:
@@ -239,9 +315,9 @@ class MidiSniffer:
         if self._manager is not None:
             self._manager.scan()
 
-    def poll(self) -> CapturedCc | None:
+    def poll(self) -> MidiEvent | None:
         try:
-            return self._captured.get_nowait()
+            return self._events.get_nowait()
         except queue.Empty:
             return None
 

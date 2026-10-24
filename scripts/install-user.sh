@@ -21,6 +21,9 @@ fi
 if ! command -v wpctl >/dev/null 2>&1 || ! command -v pw-dump >/dev/null 2>&1; then
     echo "warning: wpctl/pw-dump were not found. Install PipeWire and WirePlumber." >&2
 fi
+if ! command -v gdbus >/dev/null 2>&1; then
+    echo "warning: gdbus was not found. Multimedia MPRIS controls will not work." >&2
+fi
 
 echo "==> Creating virtual environment in $VENV"
 python3 -m venv "$VENV"
@@ -81,5 +84,10 @@ Configuration file:
 
 Service logs:
     journalctl --user -u pw-midi-volume -f
+
+Uninstall (keeps the YAML configuration):
+    "$ROOT/scripts/uninstall-user.sh"
+Uninstall and remove configuration:
+    "$ROOT/scripts/uninstall-user.sh" --purge
 
 EOF

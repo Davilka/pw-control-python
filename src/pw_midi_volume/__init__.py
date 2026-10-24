@@ -1,3 +1,3 @@
 """pw-midi-volume: control PipeWire sinks with MIDI CC controllers."""
 
-__version__ = "1.0.0"
+__version__ = "1.5.0"

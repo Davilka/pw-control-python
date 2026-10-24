@@ -112,6 +112,27 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(command[4], "41")
         self.assertAlmostEqual(float(command[5]), 0.5)
 
+    def test_set_mute(self) -> None:
+        sink = self.controller.set_mute("alsa_output.good", True)
+        self.assertEqual(sink.id, 41)
+        self.assertEqual(
+            self.calls[-1],
+            ["wpctl", "set-mute", "41", "1"],
+        )
+        self.controller.set_mute("alsa_output.good", False)
+        self.assertEqual(
+            self.calls[-1],
+            ["wpctl", "set-mute", "41", "0"],
+        )
+
+    def test_toggle_mute(self) -> None:
+        sink = self.controller.toggle_mute("alsa_output.good")
+        self.assertEqual(sink.id, 41)
+        self.assertEqual(
+            self.calls[-1],
+            ["wpctl", "set-mute", "41", "toggle"],
+        )
+
     def test_volume_is_clamped(self) -> None:
         self.controller.set_volume("alsa_output.good", 2.0)
         self.assertAlmostEqual(float(self.calls[-1][5]), 1.0)
