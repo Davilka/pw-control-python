@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=PipeWire MIDI Volume
+Name[ru]=Громкость PipeWire по MIDI
+GenericName=MIDI volume control
+GenericName[ru]=Управление громкостью по MIDI
+Comment=Configure MIDI CC bindings for PipeWire sinks
+Comment[ru]=Настройка привязок MIDI CC к PipeWire sink
+Exec=pw-midi-volume-gui
+Icon=pw-midi-volume
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+Keywords=midi;volume;pipewire;wireplumber;audio;
+StartupNotify=true

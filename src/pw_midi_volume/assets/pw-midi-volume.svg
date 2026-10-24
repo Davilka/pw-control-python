@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">pw-midi-volume</title>
+  <desc id="desc">A speaker with volume waves on a dark rounded square.</desc>
+  <defs>
+    <linearGradient id="background" x1="16" y1="8" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#24324d"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="62" y1="37" x2="108" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#background)"/>
+  <path d="M29 51h14l18-18v62L43 77H29z" fill="#f8fafc"/>
+  <path d="M70.5 47.5a23 23 0 0 1 0 33" fill="none" stroke="url(#wave)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M80.5 37.5a37 37 0 0 1 0 53" fill="none" stroke="url(#wave)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="31" cy="64" r="4" fill="#38bdf8"/>
+</svg>

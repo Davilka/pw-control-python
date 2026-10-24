@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PipeWire MIDI Volume (tray)
+Name[ru]=Громкость PipeWire по MIDI (трей)
+Comment=Start the MIDI volume configuration GUI in the system tray
+Comment[ru]=Запускать настройку громкости по MIDI в системном трее
+Exec=pw-midi-volume-gui --minimized
+Icon=pw-midi-volume
+Terminal=false
+X-GNOME-Autostart-enabled=true

@@ -1,0 +1,17 @@
+[Unit]
+Description=PipeWire MIDI volume control
+After=pipewire.service wireplumber.service
+Wants=pipewire.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/pw-midi-volume daemon
+ExecReload=/bin/kill -HUP $MAINPID
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pw-midi-volume"
+version = "1.0.0"
+description = "Control PipeWire sink volumes with MIDI CC controllers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["pipewire", "midi", "volume", "wireplumber", "systemd"]
+dependencies = [
+    "PyYAML>=6.0",
+    "python-rtmidi>=1.5",
+]
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.5"]
+dev = ["ruff>=0.6"]
+
+[project.scripts]
+pw-midi-volume = "pw_midi_volume.cli:main"
+pw-midi-volume-gui = "pw_midi_volume.gui:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pw_midi_volume = ["assets/*.svg"]
+
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["BLE001"]
